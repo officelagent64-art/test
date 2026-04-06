@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>n8n Chat</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --surface: #16161a;
+      --border: #2a2a32;
+      --accent: #ff6b35;
+      --accent2: #f7c59f;
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --user-bubble: #1e1e28;
+      --bot-bubble: #ff6b3514;
+      --bot-border: #ff6b3540;
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,107,53,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,107,53,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+      height: 90vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 0 60px rgba(255,107,53,0.08), 0 40px 80px rgba(0,0,0,0.6);
+      position: relative;
+    }
+
+    /* Header */
+    .header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface);
+      position: relative;
+    }
+
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 24px; right: 24px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.5;
+    }
+
+    .logo {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--accent), #ff9a5c);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .header-info h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .header-info span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .status-dot {
+      width: 7px; height: 7px;
+      background: #4ade80;
+      border-radius: 50%;
+      margin-left: auto;
+      box-shadow: 0 0 8px #4ade80;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Webhook config */
+    .webhook-bar {
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,107,53,0.04);
+    }
+
+    .webhook-bar label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .webhook-bar input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 7px 12px;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .webhook-bar input:focus { border-color: var(--accent); }
+    .webhook-bar input::placeholder { color: var(--muted); }
+
+    /* Messages */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
+    }
+
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .msg {
+      display: flex;
+      gap: 10px;
+      animation: fadeUp 0.3s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .msg.user .avatar {
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+    }
+
+    .msg.bot .avatar {
+      background: linear-gradient(135deg, var(--accent), #ff9a5c);
+    }
+
+    .bubble {
+      max-width: 75%;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      line-height: 1.6;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+    }
+
+    .msg.user .bubble {
+      background: var(--user-bubble);
+      border: 1px solid var(--border);
+      border-top-right-radius: 4px;
+    }
+
+    .msg.bot .bubble {
+      background: var(--bot-bubble);
+      border: 1px solid var(--bot-border);
+      border-top-left-radius: 4px;
+      color: var(--accent2);
+    }
+
+    .msg-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      align-self: flex-end;
+      margin-bottom: 2px;
+    }
+
+    /* Typing indicator */
+    .typing {
+      display: flex; gap: 4px; align-items: center;
+      padding: 14px 16px;
+    }
+
+    .typing span {
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    /* Empty state */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .empty-state .icon { font-size: 36px; opacity: 0.4; }
+    .empty-state p { font-family: 'JetBrains Mono', monospace; }
+
+    /* Input area */
+    .input-area {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      background: var(--surface);
+    }
+
+    .input-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      outline: none;
+      resize: none;
+      min-height: 46px;
+      max-height: 120px;
+      line-height: 1.5;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(255,107,53,0.12);
+    }
+
+    textarea::placeholder { color: var(--muted); }
+
+    .send-btn {
+      width: 46px; height: 46px;
+      background: linear-gradient(135deg, var(--accent), #ff8c5a);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+      flex-shrink: 0;
+    }
+
+    .send-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(255,107,53,0.4);
+    }
+
+    .send-btn:active:not(:disabled) { transform: scale(0.95); }
+
+    .send-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .send-btn svg { width: 18px; height: 18px; fill: white; }
+
+    .footer-note {
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      padding: 0 24px 10px;
+    }
+
+    .footer-note a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">⚡</div>
+    <div class="header-info">
+      <h1>n8n Webhook Chat</h1>
+      <span id="webhook-label">Configurez votre webhook ci-dessous</span>
+    </div>
+    <div class="status-dot" id="status-dot" style="background:#6b6b80; box-shadow:none;"></div>
+  </div>
+
+  <!-- Webhook URL bar -->
+  <div class="webhook-bar">
+    <label>WEBHOOK:</label>
+    <input type="text" id="webhook-url" placeholder="https://n8n-wo9l.onrender.com/webhook/ai" />
+  </div>
+
+  <!-- Messages -->
+  <div class="messages" id="messages">
+    <div class="empty-state" id="empty-state">
+      <div class="icon">⚡</div>
+      <p>Entrez votre webhook n8n<br/>et commencez à chatter</p>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <div class="input-wrap">
+      <textarea
+        id="chat-input"
+        placeholder="Écrivez votre message..."
+        rows="1"
+        onInput="autoResize(this)"
+      ></textarea>
+    </div>
+    <button class="send-btn" id="send-btn" onclick="sendMessage()" title="Envoyer">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 21L23 12 2 3v7l15 2-15 2v7z"/>
+      </svg>
+    </button>
+  </div>
+  <div class="footer-note">Connecté à <a href="https://n8n.io" target="_blank">n8n</a> via Webhook</div>
+</div>
+
+<script>
+  const messagesEl = document.getElementById('messages');
+  const inputEl = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('send-btn');
+  const webhookInput = document.getElementById('webhook-url');
+  const statusDot = document.getElementById('status-dot');
+  const webhookLabel = document.getElementById('webhook-label');
+  const emptyState = document.getElementById('empty-state');
+
+  let messages = [];
+  let isLoading = false;
+
+  // Auto-resize textarea
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  // Update status indicator
+  webhookInput.addEventListener('input', () => {
+    const url = webhookInput.value.trim();
+    if (url.startsWith('http')) {
+      statusDot.style.background = '#4ade80';
+      statusDot.style.boxShadow = '0 0 8px #4ade80';
+      webhookLabel.textContent = new URL(url).hostname;
+    } else {
+      statusDot.style.background = '#6b6b80';
+      statusDot.style.boxShadow = 'none';
+      webhookLabel.textContent = 'Configurez votre webhook ci-dessous';
+    }
+  });
+
+  // Send on Enter (Shift+Enter = newline)
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  function getTime() {
+    return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function addMessage(role, text) {
+    if (emptyState) emptyState.style.display = 'none';
+
+    const isUser = role === 'user';
+    const div = document.createElement('div');
+    div.className = `msg ${isUser ? 'user' : 'bot'}`;
+    div.innerHTML = `
+      ${isUser ? `<span class="msg-time">${getTime()}</span>` : ''}
+      <div class="avatar">${isUser ? '👤' : '⚡'}</div>
+      <div class="bubble">${escapeHtml(text)}</div>
+      ${!isUser ? `<span class="msg-time">${getTime()}</span>` : ''}
+    `;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function showTyping() {
+    if (emptyState) emptyState.style.display = 'none';
+    const div = document.createElement('div');
+    div.className = 'msg bot';
+    div.id = 'typing-indicator';
+    div.innerHTML = `
+      <div class="avatar">⚡</div>
+      <div class="bubble typing">
+        <span></span><span></span><span></span>
+      </div>
+    `;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function removeTyping() {
+    const el = document.getElementById('typing-indicator');
+    if (el) el.remove();
+  }
+
+  function escapeHtml(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br/>');
+  }
+
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    const webhookUrl = webhookInput.value.trim();
+
+    if (!text || isLoading) return;
+
+    if (!webhookUrl || !webhookUrl.startsWith('http')) {
+      webhookInput.focus();
+      webhookInput.style.borderColor = '#ef4444';
+      setTimeout(() => webhookInput.style.borderColor = '', 1500);
+      return;
+    }
+
+    isLoading = true;
+    sendBtn.disabled = true;
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+
+    addMessage('user', text);
+    showTyping();
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          timestamp: new Date().toISOString(),
+          source: 'n8n-chat-interface'
+        })
+      });
+
+      removeTyping();
+
+      if (!response.ok) {
+        addMessage('bot', `Erreur HTTP ${response.status}: ${response.statusText}`);
+      } else {
+        const contentType = response.headers.get('content-type') || '';
+        let reply = '';
+
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          // Try common response field names from n8n
+          reply = data.output
+            || data.message
+            || data.reply
+            || data.text
+            || data.response
+            || JSON.stringify(data, null, 2);
+        } else {
+          reply = await response.text();
+        }
+
+        addMessage('bot', reply || '(réponse vide)');
+      }
+
+    } catch (err) {
+      removeTyping();
+      addMessage('bot', `Erreur de connexion: ${err.message}\n\nVérifiez l'URL du webhook et les paramètres CORS.`);
+    } finally {
+      isLoading = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+</script>
+</body>
+</html>
